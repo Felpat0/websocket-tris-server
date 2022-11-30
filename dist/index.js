@@ -7,6 +7,7 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const socket_io_1 = require("socket.io");
 const Game_1 = require("./classes/Game");
+const socket_1 = require("./utils/socket");
 const app = (0, express_1.default)();
 const PORT = 4000;
 //New imports
@@ -18,6 +19,7 @@ const socketIO = new socket_io_1.Server(http, {
     },
 });
 const games = [];
+const players = [];
 socketIO.on("connection", (socket) => {
     console.log(`⚡: ${socket.id} user just connected!`);
     socket.on("message", (message) => {
@@ -25,7 +27,11 @@ socketIO.on("connection", (socket) => {
         switch (type) {
             case "join":
                 socket.join(payload.room);
-                const room = socketIO.sockets.adapter.rooms.get(payload.room);
+                const player = {
+                    id: socket.id,
+                    name: payload.name,
+                };
+                players.push(player);
                 // Tell to the client that he has joined the room
                 socketIO.to(socket.id).emit("message", {
                     type: "room",
@@ -33,16 +39,11 @@ socketIO.on("connection", (socket) => {
                         room: payload.room,
                     },
                 });
-                // Tell the other players that a new player has joined the room
-                socketIO.to(payload.room).emit("message", {
-                    type: "info",
-                    payload: `${socket.id} has joined the room! Partecipants: ${Array.from(room || []).join(", ")}`,
-                });
                 // Send the list of players to the players
                 socketIO.to(payload.room).emit("message", {
                     type: "players",
                     payload: {
-                        players: Array.from(room || []),
+                        players: (0, socket_1.getRoomPlayers)(socketIO, payload.room, players),
                     },
                 });
                 break;
@@ -50,28 +51,50 @@ socketIO.on("connection", (socket) => {
                 const clients = socketIO.sockets.adapter.rooms.get(payload.room);
                 if (!clients)
                     break;
-                const game = new Game_1.Game(Array.from(clients), payload.room);
+                const game = new Game_1.Game((0, socket_1.getRoomPlayers)(socketIO, payload.room, players), payload.room);
                 games.push(game);
-                // Tell the players that the game has started
                 socketIO.to(payload.room).emit("message", {
                     type: "info",
-                    payload: `${socket.id} has started the game!`,
-                });
-                // Send the board to the players
-                socketIO.to(payload.room).emit("message", {
-                    type: "board",
-                    payload: { board: game.getBoard() },
+                    payload: {
+                        board: game.getBoard(),
+                        players: (0, socket_1.getRoomPlayers)(socketIO, payload.room, players),
+                        currentPlayer: game.getCurrentPlayer(),
+                        room: game.getId(),
+                    },
                 });
                 break;
             case "play":
                 const currentGame = games.find((game) => game.getId() === payload.room);
                 if (currentGame) {
-                    currentGame.play(payload.row, payload.col, socket.id);
+                    const hasWon = currentGame.play(payload.row, payload.col, socket.id);
                     socketIO.to(payload.room).emit("message", {
-                        type: "board",
-                        payload: { board: currentGame.getBoard() },
+                        type: "info",
+                        payload: {
+                            board: currentGame.getBoard(),
+                            players: (0, socket_1.getRoomPlayers)(socketIO, payload.room, players),
+                            currentPlayer: currentGame.getCurrentPlayer(),
+                            room: currentGame.getId(),
+                            winner: hasWon ? currentGame.getCurrentPlayer() : undefined,
+                        },
                     });
                 }
+                break;
+            case "reset":
+                const gameToReset = games.find((game) => game.getId() === payload.room);
+                if (gameToReset) {
+                    gameToReset.reset();
+                    socketIO.to(payload.room).emit("message", {
+                        type: "info",
+                        payload: {
+                            board: gameToReset.getBoard(),
+                            players: (0, socket_1.getRoomPlayers)(socketIO, payload.room, players),
+                            currentPlayer: gameToReset.getCurrentPlayer(),
+                            room: gameToReset.getId(),
+                            winner: "reset",
+                        },
+                    });
+                }
+                break;
             default:
                 break;
         }

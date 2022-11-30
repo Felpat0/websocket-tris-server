@@ -1,9 +1,9 @@
 export type Player = {
   id: string;
   name: string;
-  wins: number;
-  losses: number;
-  draws: number;
+  wins?: number;
+  losses?: number;
+  draws?: number;
 };
 
 export type Board = {

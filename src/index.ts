@@ -2,6 +2,8 @@ import express from "express";
 import cors from "cors";
 import { Server } from "socket.io";
 import { Game } from "./classes/Game";
+import { Player } from "./types";
+import { getRoomPlayers } from "./utils/socket";
 const app = express();
 const PORT = 4000;
 
@@ -17,6 +19,7 @@ const socketIO = new Server(http, {
 });
 
 const games: Game[] = [];
+const players: Player[] = [];
 socketIO.on("connection", (socket) => {
   console.log(`⚡: ${socket.id} user just connected!`);
 
@@ -26,7 +29,12 @@ socketIO.on("connection", (socket) => {
     switch (type) {
       case "join":
         socket.join(payload.room);
-        const room = socketIO.sockets.adapter.rooms.get(payload.room);
+        const player: Player = {
+          id: socket.id,
+          name: payload.name,
+        };
+
+        players.push(player);
 
         // Tell to the client that he has joined the room
         socketIO.to(socket.id).emit("message", {
@@ -36,51 +44,66 @@ socketIO.on("connection", (socket) => {
           },
         });
 
-        // Tell the other players that a new player has joined the room
-        socketIO.to(payload.room).emit("message", {
-          type: "info",
-          payload: `${
-            socket.id
-          } has joined the room! Partecipants: ${Array.from(room || []).join(
-            ", "
-          )}`,
-        });
-
         // Send the list of players to the players
         socketIO.to(payload.room).emit("message", {
           type: "players",
           payload: {
-            players: Array.from(room || []),
+            players: getRoomPlayers(socketIO, payload.room, players),
           },
         });
         break;
       case "start":
         const clients = socketIO.sockets.adapter.rooms.get(payload.room);
         if (!clients) break;
-        const game = new Game(Array.from(clients), payload.room);
+        const game = new Game(
+          getRoomPlayers(socketIO, payload.room, players),
+          payload.room
+        );
         games.push(game);
 
-        // Tell the players that the game has started
         socketIO.to(payload.room).emit("message", {
           type: "info",
-          payload: `${socket.id} has started the game!`,
-        });
-
-        // Send the board to the players
-        socketIO.to(payload.room).emit("message", {
-          type: "board",
-          payload: { board: game.getBoard() },
+          payload: {
+            board: game.getBoard(),
+            players: getRoomPlayers(socketIO, payload.room, players),
+            currentPlayer: game.getCurrentPlayer(),
+            room: game.getId(),
+          },
         });
         break;
       case "play":
         const currentGame = games.find((game) => game.getId() === payload.room);
         if (currentGame) {
-          currentGame.play(payload.row, payload.col, socket.id);
+          const hasWon = currentGame.play(payload.row, payload.col, socket.id);
+
           socketIO.to(payload.room).emit("message", {
-            type: "board",
-            payload: { board: currentGame.getBoard() },
+            type: "info",
+            payload: {
+              board: currentGame.getBoard(),
+              players: getRoomPlayers(socketIO, payload.room, players),
+              currentPlayer: currentGame.getCurrentPlayer(),
+              room: currentGame.getId(),
+              winner: hasWon ? currentGame.getCurrentPlayer() : undefined,
+            },
           });
         }
+        break;
+      case "reset":
+        const gameToReset = games.find((game) => game.getId() === payload.room);
+        if (gameToReset) {
+          gameToReset.reset();
+          socketIO.to(payload.room).emit("message", {
+            type: "info",
+            payload: {
+              board: gameToReset.getBoard(),
+              players: getRoomPlayers(socketIO, payload.room, players),
+              currentPlayer: gameToReset.getCurrentPlayer(),
+              room: gameToReset.getId(),
+              winner: "reset",
+            },
+          });
+        }
+        break;
       default:
         break;
     }

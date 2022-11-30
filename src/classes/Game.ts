@@ -2,15 +2,15 @@ import { Player, Board } from "../types";
 
 export class Game {
   private id: string;
-  private players: Player["id"][];
+  private players: Player[];
   private board: Board;
   private currentPlayerId: Player["id"] | undefined;
   private isOver: boolean = false;
 
-  constructor(players: Player["id"][], id: string) {
+  constructor(players: Player[], id: string) {
     this.id = id;
     this.players = players;
-    this.currentPlayerId = players[0];
+    this.currentPlayerId = players[0].id;
     let squares = [
       [undefined, undefined, undefined],
       [undefined, undefined, undefined],
@@ -33,12 +33,16 @@ export class Game {
   }
 
   getPlayerCharacter(playerId: Player["id"]) {
-    return this.players.indexOf(playerId) === 0 ? "X" : "O";
+    return this.players.findIndex((p) => p.id === playerId) === 0 ? "X" : "O";
+  }
+
+  getCurrentPlayer() {
+    return this.players.find((p) => p.id === this.currentPlayerId);
   }
 
   getNextPlayer() {
     const currentIndex = this.players.findIndex(
-      (player) => player === this.currentPlayerId
+      (player) => player.id === this.currentPlayerId
     );
     return this.players[(currentIndex + 1) % this.players.length];
   }
@@ -55,21 +59,29 @@ export class Game {
   }
 
   play(row: number, col: number, player: Player["id"]): boolean {
-    if (!this.isOver && player === this.currentPlayerId) {
-      console.log(player, this.currentPlayerId);
+    if (
+      !this.isOver &&
+      player === this.currentPlayerId &&
+      !this.board.squares[row][col]
+    ) {
       this.board.squares[row][col] = player;
 
       if (this.hasPlayerWon(player)) {
-        console.log(`${player} has won!`);
-        this.currentPlayerId = undefined;
         this.isOver = true;
-        this.board.squares = this.board.squares.map((row) =>
-          row.map(() => undefined)
-        );
+        return true;
       } else {
-        this.currentPlayerId = this.getNextPlayer();
+        this.currentPlayerId = this.getNextPlayer().id;
+        return false;
       }
     }
     return false;
+  }
+
+  reset() {
+    this.board.squares = this.board.squares.map((row) =>
+      row.map(() => undefined)
+    );
+    this.currentPlayerId = this.players[0].id;
+    this.isOver = false;
   }
 }
