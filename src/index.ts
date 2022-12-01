@@ -30,7 +30,8 @@ socketIO.on("connection", (socket) => {
       case "join":
         const roomGame = games.find((game) => game.getId() === payload.room);
         if (
-          roomGame ||
+          (roomGame &&
+            getRoomPlayers(socketIO, payload.room, players).length > 0) ||
           getRoomPlayers(socketIO, payload.room, players).length > 1
         )
           return;
