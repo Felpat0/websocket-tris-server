@@ -5,12 +5,13 @@ export class Game {
   private players: Player[];
   private board: Board;
   private currentPlayerId: Player["id"] | undefined;
-  private isOver: boolean = false;
+  private state: "waiting" | "playing" | "finished" = "waiting";
 
   constructor(players: Player[], id: string) {
     this.id = id;
     this.players = players;
     this.currentPlayerId = players[0].id;
+    this.state = "playing";
     let squares = [
       [undefined, undefined, undefined],
       [undefined, undefined, undefined],
@@ -47,6 +48,12 @@ export class Game {
     return this.players[(currentIndex + 1) % this.players.length];
   }
 
+  isADraw() {
+    return this.board.squares.every((row) =>
+      row.every((square) => square !== undefined)
+    );
+  }
+
   hasPlayerWon(playerId: Player["id"]) {
     const { squares } = this.board;
     // Check if the player has won in any row or column or diagonal
@@ -60,14 +67,14 @@ export class Game {
 
   play(row: number, col: number, player: Player["id"]): boolean {
     if (
-      !this.isOver &&
+      this.state === "playing" &&
       player === this.currentPlayerId &&
       !this.board.squares[row][col]
     ) {
       this.board.squares[row][col] = player;
 
       if (this.hasPlayerWon(player)) {
-        this.isOver = true;
+        this.state = "finished";
         return true;
       } else {
         this.currentPlayerId = this.getNextPlayer().id;
@@ -82,6 +89,6 @@ export class Game {
       row.map(() => undefined)
     );
     this.currentPlayerId = this.players[0].id;
-    this.isOver = false;
+    this.state = "playing";
   }
 }

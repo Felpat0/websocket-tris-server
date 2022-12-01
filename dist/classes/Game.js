@@ -3,10 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.Game = void 0;
 class Game {
     constructor(players, id) {
-        this.isOver = false;
+        this.state = "waiting";
         this.id = id;
         this.players = players;
         this.currentPlayerId = players[0].id;
+        this.state = "playing";
         let squares = [
             [undefined, undefined, undefined],
             [undefined, undefined, undefined],
@@ -33,6 +34,9 @@ class Game {
         const currentIndex = this.players.findIndex((player) => player.id === this.currentPlayerId);
         return this.players[(currentIndex + 1) % this.players.length];
     }
+    isADraw() {
+        return this.board.squares.every((row) => row.every((square) => square !== undefined));
+    }
     hasPlayerWon(playerId) {
         const { squares } = this.board;
         // Check if the player has won in any row or column or diagonal
@@ -42,12 +46,12 @@ class Game {
             squares.every((_, i) => squares[i][2 - i] === playerId));
     }
     play(row, col, player) {
-        if (!this.isOver &&
+        if (this.state === "playing" &&
             player === this.currentPlayerId &&
             !this.board.squares[row][col]) {
             this.board.squares[row][col] = player;
             if (this.hasPlayerWon(player)) {
-                this.isOver = true;
+                this.state = "finished";
                 return true;
             }
             else {
@@ -60,7 +64,7 @@ class Game {
     reset() {
         this.board.squares = this.board.squares.map((row) => row.map(() => undefined));
         this.currentPlayerId = this.players[0].id;
-        this.isOver = false;
+        this.state = "playing";
     }
 }
 exports.Game = Game;

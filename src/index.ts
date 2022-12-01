@@ -14,7 +14,7 @@ app.use(cors());
 
 const socketIO = new Server(http, {
   cors: {
-    origin: "http://localhost:3000",
+    origin: "*",
   },
 });
 
@@ -28,6 +28,12 @@ socketIO.on("connection", (socket) => {
 
     switch (type) {
       case "join":
+        const roomGame = games.find((game) => game.getId() === payload.room);
+        if (
+          roomGame ||
+          getRoomPlayers(socketIO, payload.room, players).length > 1
+        )
+          return;
         socket.join(payload.room);
         const player: Player = {
           id: socket.id,
@@ -84,6 +90,7 @@ socketIO.on("connection", (socket) => {
               currentPlayer: currentGame.getCurrentPlayer(),
               room: currentGame.getId(),
               winner: hasWon ? currentGame.getCurrentPlayer() : undefined,
+              draw: currentGame.isADraw(),
             },
           });
         }
@@ -99,7 +106,7 @@ socketIO.on("connection", (socket) => {
               players: getRoomPlayers(socketIO, payload.room, players),
               currentPlayer: gameToReset.getCurrentPlayer(),
               room: gameToReset.getId(),
-              winner: "reset",
+              reset: true,
             },
           });
         }

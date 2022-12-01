@@ -15,7 +15,7 @@ const http = require("http").Server(app);
 app.use((0, cors_1.default)());
 const socketIO = new socket_io_1.Server(http, {
     cors: {
-        origin: "http://localhost:3000",
+        origin: "*",
     },
 });
 const games = [];
@@ -26,6 +26,10 @@ socketIO.on("connection", (socket) => {
         const { type, payload } = message;
         switch (type) {
             case "join":
+                const roomGame = games.find((game) => game.getId() === payload.room);
+                if (roomGame ||
+                    (0, socket_1.getRoomPlayers)(socketIO, payload.room, players).length > 1)
+                    return;
                 socket.join(payload.room);
                 const player = {
                     id: socket.id,
@@ -75,6 +79,7 @@ socketIO.on("connection", (socket) => {
                             currentPlayer: currentGame.getCurrentPlayer(),
                             room: currentGame.getId(),
                             winner: hasWon ? currentGame.getCurrentPlayer() : undefined,
+                            draw: currentGame.isADraw(),
                         },
                     });
                 }
@@ -90,7 +95,7 @@ socketIO.on("connection", (socket) => {
                             players: (0, socket_1.getRoomPlayers)(socketIO, payload.room, players),
                             currentPlayer: gameToReset.getCurrentPlayer(),
                             room: gameToReset.getId(),
-                            winner: "reset",
+                            reset: true,
                         },
                     });
                 }
